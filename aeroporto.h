@@ -1,4 +1,4 @@
-#define NUMERO_AEREI 5
+#define NUMERO_AEREI 10
 #define MYPIPE_PATH "/tmp/aereo_torre"
 
 struct tDati {

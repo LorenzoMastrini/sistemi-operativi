@@ -28,7 +28,6 @@ long get_random(long lMin, long lMax) {
 
 int aereo(int n, pid_t pid_torre) {
   struct tDati stDati;
-
   //codice dedicato alla visualizzazione dell'orario corrente
   char s[256];
 	time_t timet;
@@ -42,7 +41,7 @@ int aereo(int n, pid_t pid_torre) {
   long tempo_preparazione = get_random(3, 8);
   printf("[%s] Aereo: inizio preparazione aereo %d: tempo necessario = %ld secondi\n", &s, n + 1, tempo_preparazione);
   sleep(tempo_preparazione);
-
+  
   //richiesta di autorizzazione per il decollo
   int fd = open(MYPIPE_PATH, O_WRONLY);
   stDati.iCod = n + 1;
@@ -57,26 +56,28 @@ int aereo(int n, pid_t pid_torre) {
 	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
 	printf("[%s] Aereo: Richiesta di decollo inviata dall'areo %d\n", &s, n + 1);
 
-  if(n == NUMERO_AEREI - 1) {
+  if(n + 1 == NUMERO_AEREI) {
+    sleep(6);   //assicura che la exit sia inviata dopo che anche il penultimo aereo sia stato gestito (nel caso in cui l'ultimo ci metta meno a prepararsi)
 		strcpy(stDati.s, "exit");
 		if(write(fd, &stDati, sizeof(stDati)) == -1) {
 			perror("Child: Errore in write");
 			return 1;
 		}
 	}
+  close(fd);
 
   //ricevuta autorizzazione al decollo
   struct sigaction sa_aereo;
   memset(&sa_aereo, '\0', sizeof(struct sigaction));
   sa_aereo.sa_handler = SIG_IGN;
-  if (sigaction(SIGRTMIN + 1, &sa_aereo, NULL) == -1) {
+  if (sigaction(SIGRTMIN, &sa_aereo, NULL) == -1) {
     perror("Aereo: Errore in sigaction");
     return 1;
   }
   int signum;
   sigset_t sigset_aereo;
   sigemptyset(&sigset_aereo);
-  sigaddset(&sigset_aereo, SIGRTMIN + 1);
+  sigaddset(&sigset_aereo, SIGRTMIN);
   sigprocmask(SIG_BLOCK, &sigset_aereo, NULL);
   sigwait(&sigset_aereo, &signum);
 
@@ -87,6 +88,7 @@ int aereo(int n, pid_t pid_torre) {
 	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
   printf("[%s] Aereo: inizio decollo aereo %d: tempo necessario = %ld secondi\n", &s, n + 1, tempo_decollo);
   sleep(tempo_decollo);
+  //sleep(5);
 
   //invio notifica di fine decollo (e terminazione aereo)
   time(&timet);
@@ -96,12 +98,10 @@ int aereo(int n, pid_t pid_torre) {
 
   union sigval value;
   value.sival_int = n + 1;
-  if (sigqueue(pid_torre, SIGRTMIN + 1, value)/*kill(pid_torre, SIGRTMIN + 1)*/ == -1) {
-		perror("Aereo: Errore in kill");
+  if (sigqueue(pid_torre, SIGRTMIN + 1, value) == -1) {
+		perror("Aereo: Errore in sigqueue");
 		return 1;
 	}
-
-  close(fd);
 
   return 0;
 }

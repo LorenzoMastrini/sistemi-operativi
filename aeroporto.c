@@ -12,10 +12,11 @@ int hangar();
 
 int main() {
 	unlink(MYPIPE_PATH);   //elimina la pipe nel caso in cui il programma fosse terminato in anticipo, prima della unlink su torre.c
+	//elimina i semafori nel caso in cui il programma fosse terminato in anticipo, prima delle unlink su torre.c
 	sem_unlink("/pista1");
 	sem_unlink("/pista2");
-	
-	pid_t pid[2];   //memorizza i pid dei figli
+
+	pid_t pid[2];   //memorizza i pid dei figli (torre e hangar)
 
 	for(int n = 0; n < 2; n++) {
 		pid[n] = fork();

@@ -29,7 +29,13 @@ int hangar(pid_t pid_torre) {
 		sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
 		printf("[%s] Hangar: creazione processo aereo %d\n", &s, n + 1);
 
-		pid[n] = fork();
+		int fork_ret;
+		if ((fork_ret = fork()) == -1) {
+			perror("Hangar: Errore in fork");
+			return 1;
+		} else {
+			pid[n] = fork_ret;
+		}
 
 		if (pid[n] < 0) {   //errore
 			fprintf(stderr, "Fork fallita");
@@ -45,7 +51,11 @@ int hangar(pid_t pid_torre) {
 	printf("[%s] Hangar: fine creazione aerei; inizio attesa\n", &s);
 
 	for (int n = 0; n < NUMERO_AEREI; n++) {
-			waitpid(pid[n], NULL, 0);   //attesa terminazione di tutti i processi aerei
+			//printf("attesa figlio %d\n", n+1);
+			if (waitpid(pid[n], NULL, 0) == -1) {   //attesa terminazione di tutti i processi aerei
+				perror("Hangar: Errore in waitpid");
+				return 1;
+			}
 			/*automaticamente viene atteso il decollo dell'ultimo aereo, dopo il quale
 			l'hangar notifica alla torre che gli aerei sono teminati*/
 	}
@@ -55,7 +65,7 @@ int hangar(pid_t pid_torre) {
 	pTm = localtime(&timet);
 	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
 	printf("[%s] Hangar: non ci sono più aerei da far decollare\n", &s);
-	if (kill(pid_torre, SIGRTMIN) == -1) {
+	if (kill(pid_torre, SIGRTMIN + 2) == -1) {
 		perror("Hangar: Errore in kill");
 		return 1;
 	}
