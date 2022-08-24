@@ -8,27 +8,14 @@
 #include <semaphore.h>
 #include "aeroporto.h"
 
-//variabili per visualizzare l'orario corrente (globali perché necessarie anche nell'eventuale handler)
-time_t timet;
-struct tm *pTm;
-char s[256];
-
-
-
-int pid_aereo_decollato;   //memorizza il pid dell'aereo che ha finito il decollo e ha inviato la notifica (globale perché lo uso nella funzione torre)
-/*
-void handler_fine_decollo (int iSignalCode, siginfo_t *si, void *p) {
-	pid_aereo_decollato = si -> si_pid;
-	time(&timet);
-	pTm = localtime(&timet);
-	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
-	printf("[%s] Torre: ricevimento notifica di fine decollo dall'aereo %d\n", &s, si->si_value);
-	return;
-}
-*/
 
 
 int torre() {
+	//variabili per visualizzare l'orario corrente (globali perché necessarie anche nell'eventuale handler)
+	time_t timet;
+	struct tm *pTm;
+	char s[256];
+
 	int fd;   //file descriptor per la pipe delle richieste di autorizzazione al decollo
 	struct tDati stDati;   //struttura dati passata con la pipe
 	//memorizzano il valore dei semafori delle piste come interi
@@ -46,6 +33,7 @@ int torre() {
 	memset(&sa_torre, '\0', sizeof(struct sigaction));
 	sa_torre.sa_sigaction = SIG_IGN;
 	sa_torre.sa_flags = SA_SIGINFO;
+	int pid_aereo_decollato;   //memorizza il pid dell'aereo che ha finito il decollo e ha inviato la notifica
 
 	struct sigaction sa_torre2;
 	//mascheramento del segnale inviato dall'hangar (fine creazione aerei) che termina prima della torre
@@ -85,6 +73,7 @@ int torre() {
 	int cicli;
 	fd = open(MYPIPE_PATH, O_RDWR);
 	stDati.s[0] = '\0';
+	sleep(1);
 	while(strcmp(stDati.s, "exit")) {   //fa un ciclo in più rispetto al numero di aerei perché legge la stringa "exit"
 		if(read(fd, &stDati, sizeof(stDati)) == -1) {
 			perror("Torre: Errore in read");
@@ -99,7 +88,6 @@ int torre() {
 		} else {
 			break;
 		}
-		//printf("%s\n\n", stDati.s);
 		cicli = cicli + 1;
 
 		//se entrambe le piste sono occupate, attende la fine del decollo di uno dei due aerei che le impegnano
@@ -132,6 +120,14 @@ int torre() {
 				sem_getvalue(pista2, &valore_pista2);
 			  printf("%d (sem_post pista 2)\n", valore_pista2);
 			}
+		}
+		sigset_t sig_pendenti;
+		if (sigpending(&sigset_torre) == -1) {
+			perror("Torre: Errore in pause");
+			return 1;
+		} else {
+			printf("ciao\n");
+			//...
 		}
 
 		//invio autorizzazione di decollo
@@ -178,7 +174,7 @@ int torre() {
 		printf("ciao1\n");
 		siginfo_t info;
 		if (sigwaitinfo(&sigset_torre, &info) == -1) {   //attesa fine decollo dalla sola pista 1
-			perror("Torre: Errore in pause");
+			perror("Torre: Errore in sigwatinfo");
 			return 1;
 		}
 		time(&timet);
@@ -220,8 +216,7 @@ int torre() {
 		printf("[%s] Torre: ricevimento notifica di fine decollo dall'aereo %d\n", &s, info2.si_value);
 	}
 
-
-	// Gestione con handler di SIGRTMIN (notifica di fine decollo aerei dall'hangar)
+	// Gestione di SIGRTMIN (notifica di fine decollo aerei dall'hangar)
 	memset(&sa_torre2, '\0', sizeof(struct sigaction));
 	sa_torre.sa_handler = SIG_IGN;
 	if (sigaction(SIGRTMIN + 2, &sa_torre2, NULL) == -1) {

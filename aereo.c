@@ -41,8 +41,18 @@ int aereo(int n, pid_t pid_torre) {
   long tempo_preparazione = get_random(3, 8);
   printf("[%s] Aereo: inizio preparazione aereo %d: tempo necessario = %ld secondi\n", &s, n + 1, tempo_preparazione);
   sleep(tempo_preparazione);
-  
+/*
+  if (n + 1 == NUMERO_AEREI) {
+    sleep(3);
+  } else {
+    sleep(8);
+  }
+*/
   //richiesta di autorizzazione per il decollo
+  time(&timet);
+	pTm = localtime(&timet);
+	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
+	printf("[%s] Aereo: invio richiesta di decollo dall'areo %d\n", &s, n + 1);
   int fd = open(MYPIPE_PATH, O_WRONLY);
   stDati.iCod = n + 1;
   stDati.pid_aereo = getpid();
@@ -51,20 +61,6 @@ int aereo(int n, pid_t pid_torre) {
 		perror("Aereo: Errore in write");
 		return 1;
 	}
-  time(&timet);
-	pTm = localtime(&timet);
-	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
-	printf("[%s] Aereo: Richiesta di decollo inviata dall'areo %d\n", &s, n + 1);
-
-  if(n + 1 == NUMERO_AEREI) {
-    sleep(6);   //assicura che la exit sia inviata dopo che anche il penultimo aereo sia stato gestito (nel caso in cui l'ultimo ci metta meno a prepararsi)
-		strcpy(stDati.s, "exit");
-		if(write(fd, &stDati, sizeof(stDati)) == -1) {
-			perror("Child: Errore in write");
-			return 1;
-		}
-	}
-  close(fd);
 
   //ricevuta autorizzazione al decollo
   struct sigaction sa_aereo;
@@ -88,8 +84,13 @@ int aereo(int n, pid_t pid_torre) {
 	sprintf(s, "%02d:%02d:%02d", pTm->tm_hour, pTm->tm_min, pTm->tm_sec);
   printf("[%s] Aereo: inizio decollo aereo %d: tempo necessario = %ld secondi\n", &s, n + 1, tempo_decollo);
   sleep(tempo_decollo);
-  //sleep(5);
-
+  /*
+  if (n + 1 == NUMERO_AEREI) {
+    sleep(5);
+  } else {
+    sleep(15);
+  }
+*/
   //invio notifica di fine decollo (e terminazione aereo)
   time(&timet);
 	pTm = localtime(&timet);
@@ -102,6 +103,17 @@ int aereo(int n, pid_t pid_torre) {
 		perror("Aereo: Errore in sigqueue");
 		return 1;
 	}
+
+  //l'ultimo aereo creato invia la exit per chiudere la pipe
+  if(n + 1 == NUMERO_AEREI) {
+    sleep(15);   //assicura che la exit sia inviata dopo che anche il penultimo aereo sia stato gestito, nel caso in cui l'ultimo ci metta meno a terminare
+		strcpy(stDati.s, "exit");
+		if(write(fd, &stDati, sizeof(stDati)) == -1) {
+			perror("Child: Errore in write");
+			return 1;
+		}
+	}
+  close(fd);
 
   return 0;
 }
